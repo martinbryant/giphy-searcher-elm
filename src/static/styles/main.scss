@@ -3,3 +3,38 @@ $icon-font-path: '~bootstrap-sass/assets/fonts/bootstrap/';
 @import '~bootstrap-sass/assets/stylesheets/_bootstrap.scss';
 
 // can add Boostrap overrides, additional Sass/CSS below...
+
+.container {
+    margin-left:auto;
+    margin-right:auto;
+    padding-left:15px;
+    padding-right:15px;
+}
+
+.result-display {
+    margin-bottom: 50px;
+}
+
+.result-grid {
+    margin: 0 auto;
+    display:grid;
+    grid-template-columns: repeat(5, 200px);
+    grid-gap: 20px;
+    justify-content: center;
+    justify-items: center;
+    align-items: center;
+}
+
+.giph {
+    width:200px;
+}
+
+.add-more-button {
+    margin-bottom:100px;
+}
+
+@media (min-width: 1200px){
+    .container{
+        width: 1170px;
+    }
+}

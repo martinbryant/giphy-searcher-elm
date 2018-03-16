@@ -1,14 +1,42 @@
-$icon-font-path: '~bootstrap-sass/assets/fonts/bootstrap/';
-@import '~bootstrap-sass/assets/stylesheets/bootstrap/_mixins.scss';
-@import '~bootstrap-sass/assets/stylesheets/_bootstrap.scss';
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+}
 
-// can add Boostrap overrides, additional Sass/CSS below...
+html {
+  box-sizing: border-box;
+  margin: 0 auto;
+}
 
+body, h1, input{
+    font-family: "Open Sans", Helvetica, Arial, sans-serif!important;
+    font-weight:500;
+}
 .container {
     margin-left:auto;
     margin-right:auto;
-    padding-left:15px;
-    padding-right:15px;
+    max-width: 1170px;
+}
+
+.title {
+    text-align: center;
+}
+
+.search-form {
+    margin: 0 auto 50px;
+    display:grid;
+    grid-template-columns: 150px 90px;
+    grid-gap: 10px;
+    justify-content: center;
+}
+
+.search-input {
+   
+}
+
+.search-button {
+   
 }
 
 .result-display {
@@ -18,7 +46,7 @@ $icon-font-path: '~bootstrap-sass/assets/fonts/bootstrap/';
 .result-grid {
     margin: 0 auto;
     display:grid;
-    grid-template-columns: repeat(5, 200px);
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     grid-gap: 20px;
     justify-content: center;
     justify-items: center;
@@ -30,11 +58,6 @@ $icon-font-path: '~bootstrap-sass/assets/fonts/bootstrap/';
 }
 
 .add-more-button {
-    margin-bottom:100px;
-}
-
-@media (min-width: 1200px){
-    .container{
-        width: 1170px;
-    }
+    margin: 0 auto 100px;
+    width: 75px;
 }

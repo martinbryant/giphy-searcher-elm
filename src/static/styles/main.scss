@@ -23,20 +23,24 @@ body, h1, input{
     text-align: center;
 }
 
-.search-form {
-    margin: 0 auto 50px;
+.search {
+    margin-bottom : 50px;
     display:grid;
-    grid-template-columns: 150px 90px;
+    grid-template-rows: 1fr 1fr;
+    grid-gap:10px;
+}
+
+.search-form {
+    margin: 0 auto;
+    display:grid;
+    grid-template-columns: 150px 60px;
     grid-gap: 10px;
     justify-content: center;
 }
 
-.search-input {
-   
-}
-
-.search-button {
-   
+.search-error {
+    margin:0 auto;
+    color:red;
 }
 
 .result-display {
@@ -53,11 +57,24 @@ body, h1, input{
     align-items: center;
 }
 
-.giph {
+.gif {
     width:200px;
 }
 
-.add-more-button {
-    margin: 0 auto 100px;
-    width: 75px;
+.loading-section {
+    margin-bottom: 100px;
 }
+
+.spinner, .load-more-button, .error-message {
+    display:block;
+    margin:0 auto;
+    width:75px;
+}
+
+.error-message {
+    width:150px;
+    color :red;
+    text-align:center;
+}
+
+

@@ -1,10 +1,10 @@
 module Main exposing (..)
 
 import Html exposing (..)
-import Html.Attributes exposing (class, id, disabled)
-import Html.Events exposing (onClick, onInput)
+import Html.Attributes exposing (class, id, disabled, type_, name)
+import Html.Events exposing (onClick, onSubmit, onWithOptions, Options)
 import Http
-import Json.Decode exposing (Decoder, at, list)
+import Json.Decode as Json exposing (Decoder)
 
 
 -- APP
@@ -31,14 +31,15 @@ subscriptions model =
 
 init : ( Model, Cmd Msg )
 init =
-    ( Model "" [] 5 0, Cmd.none )
+    ( Model "" Nothing 5 [] Loading, getTrendingGif )
 
 
 type alias Model =
     { searchTerm : String
-    , giphyUrlList : List String
-    , giphsToLoad : Int
-    , giphsOffset : Int
+    , searchError : Maybe String
+    , gifsRequired : Int
+    , loadedGifList : List String
+    , newGifs : WebData (List String)
     }
 
 
@@ -57,32 +58,52 @@ type alias WebData a =
 --DATA
 
 
-giphyUrlDecoder : Decoder String
-giphyUrlDecoder =
-    Json.Decode.at [ "images", "fixed_height_downsampled", "url" ] Json.Decode.string
+gifUrlDecoder : Decoder String
+gifUrlDecoder =
+    Json.at [ "images", "fixed_height_downsampled", "url" ] Json.string
 
 
-giphyDataDecoder : Decoder (List String)
-giphyDataDecoder =
-    Json.Decode.at [ "data" ] (list giphyUrlDecoder)
+gifDataDecoder : Decoder (List String)
+gifDataDecoder =
+    Json.at [ "data" ] (Json.list gifUrlDecoder)
 
 
-getGiphSearch : Model -> Cmd Msg
-getGiphSearch model =
-    Http.send RecieveGiphList <|
+getGifSearch : Model -> Cmd Msg
+getGifSearch model =
+    Http.send RecieveGifList <|
         Http.get
-            (giphySearchUrl model)
-            giphyDataDecoder
+            (gifSearchUrl model)
+            gifDataDecoder
 
 
-giphySearchUrl : Model -> String
-giphySearchUrl { searchTerm, giphsToLoad, giphsOffset } =
+gifSearchUrl : Model -> String
+gifSearchUrl model =
     "http://api.giphy.com/v1/gifs/search?q="
-        ++ searchTerm
+        ++ model.searchTerm
         ++ "&limit="
-        ++ (toString giphsToLoad)
+        ++ (toString model.gifsRequired)
         ++ "&offset="
-        ++ (toString giphsOffset)
+        ++ (toString <| calcOffset model.loadedGifList)
+        ++ "&api_key=FnWOsAt1MrjCleoqgtcZS57GN8HjKn0j"
+
+
+calcOffset : List String -> Int
+calcOffset gifList =
+    List.length gifList
+
+
+getTrendingGif : Cmd Msg
+getTrendingGif =
+    Http.send RecieveGifList <|
+        Http.get
+            gifTrendingUrl
+            gifDataDecoder
+
+
+gifTrendingUrl : String
+gifTrendingUrl =
+    "http://api.giphy.com/v1/gifs/trending?"
+        ++ "limit=10"
         ++ "&api_key=FnWOsAt1MrjCleoqgtcZS57GN8HjKn0j"
 
 
@@ -91,57 +112,51 @@ giphySearchUrl { searchTerm, giphsToLoad, giphsOffset } =
 
 
 type Msg
-    = UpdateSearchField String
-    | SubmitSearch
-    | AddMoreGiphs
-    | RecieveGiphList (Result Http.Error (List String))
+    = SubmitSearch String
+    | LoadMoreGifs
+    | RecieveGifList (Result Http.Error (List String))
+
+
+
+-- | AddMoreGiphs
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        UpdateSearchField searchTerm ->
-            ( { model | searchTerm = searchTerm }, Cmd.none )
+        SubmitSearch searchTerm ->
+            if String.isEmpty searchTerm then
+                ( { model | searchError = Just "Search cannot be blank" }, Cmd.none )
+            else
+                let
+                    newModel =
+                        { model
+                            | searchTerm = searchTerm
+                            , searchError = Nothing
+                            , loadedGifList = []
+                            , newGifs = Loading
+                        }
+                in
+                    ( newModel, getGifSearch newModel )
 
-        SubmitSearch ->
-            let
-                newModel =
-                    { model | giphsOffset = 0 }
-            in
-                ( newModel, getGiphSearch newModel )
+        LoadMoreGifs ->
+            ( { model | newGifs = Loading }, getGifSearch model )
 
-        AddMoreGiphs ->
-            let
-                newModel =
-                    { model | giphsOffset = model.giphsOffset + 5 }
-            in
-                ( newModel, getGiphSearch newModel )
+        RecieveGifList (Ok urls) ->
+            ( { model
+                | newGifs =
+                    (if String.isEmpty model.searchTerm then
+                        NotAsked
+                     else
+                        Success urls
+                    )
+                , loadedGifList = List.append model.loadedGifList urls
+              }
+            , Cmd.none
+            )
 
-        RecieveGiphList (Ok urls) ->
-            ( { model | giphyUrlList = isSearchNew model urls }, Cmd.none )
-
-        RecieveGiphList (Err error) ->
-            ( { model | giphyUrlList = [] }, Cmd.none )
-
-
-isSearchNew : Model -> List String -> List String
-isSearchNew model urls =
-    case model.giphsOffset of
-        0 ->
-            urls
-
-        _ ->
-            List.append model.giphyUrlList urls
-
-
-isSearchTermValid : String -> Maybe String
-isSearchTermValid searchTerm =
-    case searchTerm of
-        "" ->
-            Just "Cannot be blank"
-
-        _ ->
-            Nothing
+        RecieveGifList (Err error) ->
+            ( { model | newGifs = Failure error }, Cmd.none )
 
 
 
@@ -154,85 +169,137 @@ view model =
         [ div [ class "title" ]
             [ h1 [] [ text "Giphy Searcher" ]
             ]
-        , div [ class "search-form" ]
-            [ input
-                [ class "search-input"
-                , onInput UpdateSearchField
-                ]
-                []
-            , button
-                [ class "search-button"
-                , disabled <| isSearchFormBlank model
-                , onClick SubmitSearch
-                ]
-                [ text "Search Giphy" ]
+        , div [ class "search" ]
+            [ searchFormView
+            , searchBoxValidationView model.searchError
             ]
         , div [ class "result-display" ]
-            [ giphsView model ]
-        , div
-            [ id "add-more"
-            , class "add-more-button"
-            ]
-            [ button
-                [ onClick AddMoreGiphs
-                , disabled <| List.isEmpty model.giphyUrlList
-                ]
-                [ text "Load more" ]
-            ]
+            [ gifView model.loadedGifList ]
+        , div [ class "loading-section" ] [ calcLoadingView model.newGifs ]
         ]
 
 
-isSearchFormBlank : Model -> Bool
-isSearchFormBlank { searchTerm } =
-    searchTerm == ""
+searchFormView : Html Msg
+searchFormView =
+    form
+        [ class "search-form"
+        , onWithOptions "submit"
+            (Options True True)
+            decodeForm
+        ]
+        [ input
+            [ class "search-input"
+            , name "search-term"
+            , type_ "text"
+            ]
+            []
+        , input
+            [ class "search-button"
+            , type_ "submit"
+            ]
+            [ text "Search Giphy" ]
+        ]
 
 
-
--- giphView : Model -> Html msg
--- giphView model =
---     case model.giphyUrlList of
---         NotAsked ->
---             noGiphView
---         Loading ->
---             loadingView
---         Success urlList ->
---             giphsView urlList
---         Failure error ->
---             errorView <| toString <| error
+decodeField : String -> Decoder String
+decodeField name =
+    Json.at
+        [ "currentTarget"
+        , name
+        , "value"
+        ]
+        Json.string
 
 
-noGiphView : Html msg
-noGiphView =
-    div [] []
+decodeForm : Decoder Msg
+decodeForm =
+    Json.map
+        SubmitSearch
+        (decodeField "search-term")
 
 
-loadingView : Html msg
-loadingView =
-    div [] [ text "Spinner" ]
+searchBoxValidationView : Maybe String -> Html msg
+searchBoxValidationView searchError =
+    case searchError of
+        Just errMsg ->
+            div [ class "search-error" ] [ text errMsg ]
+
+        Nothing ->
+            text ""
 
 
-giphsView : Model -> Html msg
-giphsView { giphyUrlList } =
+gifView : List String -> Html msg
+gifView loadedGifList =
     div [ class "result-grid" ]
-        (List.map renderPictureBox giphyUrlList)
-
-
-errorView : String -> Html msg
-errorView error =
-    text <| toString <| error
+        (List.map
+            renderPictureBox
+            loadedGifList
+        )
 
 
 renderPictureBox : String -> Html msg
 renderPictureBox url =
-    img [ class "giph", Html.Attributes.src url ] []
+    img [ class "gif", Html.Attributes.src url ] []
+
+
+calcLoadingView : WebData a -> Html Msg
+calcLoadingView newGifs =
+    case newGifs of
+        NotAsked ->
+            div [] []
+
+        Loading ->
+            loadingView
+
+        Success a ->
+            loadMoreButtonView
+
+        Failure e ->
+            div [ class "error-message" ]
+                [ errorView e ]
+
+
+loadingView : Html msg
+loadingView =
+    i [ class "spinner fas fa-spinner fa-spin fa-4x" ] []
+
+
+loadMoreButtonView : Html Msg
+loadMoreButtonView =
+    button
+        [ class "load-more-button"
+        , onClick LoadMoreGifs
+        ]
+        [ text "Load more" ]
+
+
+errorView : Http.Error -> Html msg
+errorView error =
+    case error of
+        Http.Timeout ->
+            text "Timeout Error"
+
+        Http.NetworkError ->
+            text "Network Error"
+
+        Http.BadPayload e a ->
+            text <| "Payload Error"
+
+        Http.BadUrl a ->
+            text "BadUrl Error"
+
+        Http.BadStatus a ->
+            text "BadStatus Error"
 
 
 
 --TODO LIST
---Add validation to the search bar to prevent blank input
---Hook up load more button
+--Add validation to the search bar to prevent blank input Y
+--Hook up load more button Y
+--Cover all network error messages
+--trending gifs on page load
 --Add styling including responsive design and spinner
---Conditional load more button
+--Conditional load more button Y
 --Add change layout button
 --Add number of giphs to load button
 --Auto loading on scroll
